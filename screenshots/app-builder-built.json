@@ -1,0 +1,40 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Living Room Ledger",
+      "hasCanvas": false,
+      "bodyTextLen": 5321,
+      "bodyTextHash": "a20f60ec55efe6e339f2e37525e54e5b0cea0a8271bc1fe64f37fc972f93d981",
+      "bodyTextPrefix": "U.S. TELEVISION · 1948–2026 Living Room Ledger Prices, not catal",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Living Room Ledger",
+      "hasCanvas": false,
+      "bodyTextLen": 5217,
+      "bodyTextHash": "3a620e9d8372060f664e2942449be2d8f442544dcadb40b6de489d78d924c9b1",
+      "bodyTextPrefix": "U.S. TELEVISION · 1948–2026 Living Room Ledger Prices, not catal",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [
+    "BRAND NOTE: no custom public/og.jpg — the platform will serve the og.grok.me placeholder. Custom cards are the default for games of every kind (DOM board/word games included), whimsical apps, creative tools, and brand-forward pages — only plain utilities (converters, CRUD trackers, admin dashboards) keep the placeholder. If this app is not a plain utility, finish the brand-asset pass per /workspace/.grok/skills/og/SKILL.md."
+  ],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}

@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Source Sans 3", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Palatino, "Palatino Linotype", serif;
+
+  --color-paper: #f3efe6;
+  --color-paper-2: #e7e0d4;
+  --color-surface: #faf7f2;
+  --color-ink: #1c1915;
+  --color-muted: #6f675d;
+  --color-line: #ddd4c6;
+  --color-copper: #b4532a;
+  --color-copper-deep: #8a3e1e;
+  --color-pine: #2f6a45;
+  --color-bronze: #8d5b2a;
+  --color-s0: #1c1915;
+  --color-s1: #b4532a;
+  --color-s2: #2f6a45;
+  --color-s3: #8d5b2a;
+
+  --radius-card: 1rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-copper);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+.tick {
+  accent-color: var(--color-copper);
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.ledger-card {
+  box-shadow:
+    0 0 0 1px rgba(28, 25, 21, 0.07),
+    0 1px 2px -1px rgba(28, 25, 21, 0.06),
+    0 16px 32px -22px rgba(28, 25, 21, 0.45);
+}
+
+.ledger-stat {
+  box-shadow:
+    0 0 0 1px rgba(28, 25, 21, 0.07),
+    0 1px 2px -1px rgba(28, 25, 21, 0.05);
+  border-top: 2px solid var(--color-copper);
+}
