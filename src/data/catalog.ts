@@ -1,4 +1,4 @@
-import { to2026Dollars } from "./cpi";
+import { cpiFor, to2026Dollars } from "./cpi";
 
 export type AspectId = "cable" | "home" | "rent" | "streaming" | "live" | "satellite";
 
@@ -25,6 +25,12 @@ export type Series = {
   source: string;
   quality: Quality;
   points: PricePoint[];
+  /** Drawn when a shelf opens. Comparison series stay off until the reader turns them on. */
+  featured?: boolean;
+  /** At most one series in a group can sit on the bill. */
+  exclusiveGroup?: string;
+  /** Standalone series already counted inside this package. */
+  includes?: string[];
 };
 
 export type Aspect = {
@@ -417,6 +423,11 @@ export const SERIES: Series[] = [
       { year: 2023, price: 15.99 },
       { year: 2024, price: 16.99 },
       { year: 2025, price: 18.49 },
+      {
+        year: 2026,
+        price: 18.49,
+        detail: "Still the Standard ad-free price in fall 2026. Basic with ads is $10.99. Premium is $22.99.",
+      },
     ],
   },
   {
@@ -454,7 +465,11 @@ export const SERIES: Series[] = [
       { year: 2023, price: 5.99 },
       { year: 2024, price: 7.99 },
       { year: 2025, price: 10.99 },
-      { year: 2026, price: 12.99 },
+      {
+        year: 2026,
+        price: 12.99,
+        detail: "August 2026 list price, up from $10.99. Premium Plus, without ads, is $19.99.",
+      },
     ],
   },
   {
@@ -473,7 +488,11 @@ export const SERIES: Series[] = [
       { year: 2021, price: 4.99, detail: "Paramount+ Essential launch price." },
       { year: 2023, price: 5.99 },
       { year: 2024, price: 7.99 },
-      { year: 2026, price: 8.99 },
+      {
+        year: 2026,
+        price: 8.99,
+        detail: "15 January 2026 increase, from $7.99. Premium, without ads, is $13.99.",
+      },
     ],
   },
   {
@@ -485,7 +504,7 @@ export const SERIES: Series[] = [
     hold: true,
     through: 2026,
     blurb:
-      "Annual membership divided by 12, not the pricier month-to-month plan. Video joined the bundle in 2006. In 2026, month-to-month Prime is $14.99.",
+      "Annual membership divided by 12, not the month-to-month plan, which is its own line. Video joined the bundle in 2006.",
     source: "Amazon Prime U.S. annual rates",
     quality: "list",
     points: [
@@ -493,6 +512,308 @@ export const SERIES: Series[] = [
       { year: 2014, price: 8.25, detail: "$99 a year." },
       { year: 2018, price: 9.92, detail: "$119 a year." },
       { year: 2022, price: 11.58, detail: "$139 a year." },
+      {
+        year: 2026,
+        price: 11.58,
+        detail: "Still $139 a year in fall 2026. Month-to-month Prime is $14.99.",
+      },
+    ],
+  },
+  {
+    id: "netflix-ads",
+    name: "Netflix Standard with ads",
+    short: "Netflix ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "The ads tier, year-end U.S. list price. It is not the Standard plan on the main line.",
+    source: "Netflix U.S. list prices. Launched November 2022 at $6.99, $7.99 in January 2025, $8.99 in March 2026.",
+    quality: "list",
+    points: [
+      { year: 2022, price: 6.99, detail: "November launch." },
+      { year: 2025, price: 7.99, detail: "January increase." },
+      { year: 2026, price: 8.99, detail: "March increase." },
+    ],
+  },
+  {
+    id: "disney-ads",
+    name: "Disney+ (with ads)",
+    short: "Disney+ ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "The ads tier. The main Disney+ line is the no-ads plan.",
+    source: "Disney+ U.S. list prices. Ads tier launched December 2022.",
+    quality: "list",
+    points: [
+      { year: 2022, price: 7.99, detail: "December launch, beside the no-ads increase to $10.99." },
+      { year: 2024, price: 9.99, detail: "October increase." },
+      { year: 2025, price: 11.99, detail: "October increase." },
+      { year: 2026, price: 12.49, detail: "23 September increase for new subscribers." },
+    ],
+  },
+  {
+    id: "max-ads",
+    name: "Max Basic with ads",
+    short: "Max ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "The ads tier. The main Max line is Standard, without ads.",
+    source: "Max U.S. list prices. With-ads tier launched June 2021 at $9.99 and rose to $10.99 on 21 October 2025.",
+    quality: "list",
+    points: [
+      { year: 2021, price: 9.99, detail: "June launch of the with-ads tier." },
+      { year: 2025, price: 10.99, detail: "21 October increase." },
+      { year: 2026, price: 10.99, detail: "Unchanged through fall 2026." },
+    ],
+  },
+  {
+    id: "hulu-premium",
+    name: "Hulu Premium (no ads)",
+    short: "Hulu no ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "The no-ads plan. The main Hulu line is the with-ads plan.",
+    source: "Hulu U.S. list prices. No-ads launched September 2015. The 23 September 2026 price is the Hulu help-center rate for new subscribers.",
+    quality: "list",
+    points: [
+      { year: 2015, price: 11.99, detail: "September launch of the no-ads plan." },
+      { year: 2021, price: 12.99 },
+      { year: 2022, price: 14.99 },
+      { year: 2023, price: 17.99 },
+      { year: 2024, price: 18.99 },
+      { year: 2026, price: 21.49, detail: "23 September increase for new subscribers, from $18.99." },
+    ],
+  },
+  {
+    id: "peacock-plus",
+    name: "Peacock Premium Plus",
+    short: "Peacock no ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "Premium Plus, the no-ads plan. The main Peacock line is Premium with ads.",
+    source: "Peacock U.S. list prices.",
+    quality: "list",
+    points: [
+      { year: 2020, price: 9.99, detail: "July national launch." },
+      { year: 2023, price: 11.99 },
+      { year: 2024, price: 13.99 },
+      { year: 2025, price: 16.99 },
+      { year: 2026, price: 19.99, detail: "August 2026 increase, from $16.99." },
+    ],
+  },
+  {
+    id: "paramount-premium",
+    name: "Paramount+ Premium",
+    short: "Paramount+ no ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "The no-ads plan, with Showtime from 2023. The main Paramount+ line is Essential, with ads. Live TV on this plan still carries ads.",
+    source: "Paramount+ U.S. list prices. Premium launched March 2021.",
+    quality: "list",
+    points: [
+      { year: 2021, price: 9.99, detail: "March launch, three months before Essential." },
+      { year: 2023, price: 11.99, detail: "June increase. Showtime is bundled in at this price." },
+      { year: 2024, price: 12.99, detail: "August increase." },
+      { year: 2026, price: 13.99, detail: "15 January 2026 increase, from $12.99." },
+    ],
+  },
+  {
+    id: "prime-monthly",
+    name: "Amazon Prime, month to month",
+    short: "Prime monthly",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    blurb: "The month-to-month membership, not the annual plan divided by 12. The chart starts when the 2022 rate is documented.",
+    source: "Amazon Prime U.S. monthly rate. February 2022 increase to $14.99, still the list price in fall 2026.",
+    quality: "list",
+    points: [
+      {
+        year: 2022,
+        price: 14.99,
+        detail: "February 2022. Monthly rose from $12.99 as the annual plan went to $139.",
+      },
+      { year: 2026, price: 14.99, detail: "Still $14.99 a month in fall 2026." },
+    ],
+  },
+  {
+    id: "espn-select",
+    name: "ESPN Select",
+    short: "ESPN Select",
+    aspect: "streaming",
+    unit: "month",
+    hold: false,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "espn-plan",
+    blurb:
+      "ESPN+ until August 2025, then ESPN Select. Year-end list price for a new subscriber. Years without a dot were not pinned down, so the line stops rather than inventing them.",
+    source:
+      "ESPN U.S. list prices. Launch 12 April 2018 at $4.99 (ESPN). Later steps: Variety (August 2020), Axios (July 2021 and August 2022), ESPN Fan Support for the 17 September 2026 price of $13.99, up from $12.99.",
+    quality: "list",
+    points: [
+      { year: 2018, price: 4.99, detail: "12 April launch, as ESPN+." },
+      { year: 2019, price: 4.99 },
+      { year: 2020, price: 5.99, detail: "12 August, for new subscribers. Existing monthly subscribers kept $4.99 for a year." },
+      { year: 2021, price: 6.99, detail: "July increase." },
+      { year: 2022, price: 9.99, detail: "23 August increase, from $6.99." },
+      {
+        year: 2025,
+        price: 12.99,
+        detail: "The price ESPN Select rose from on 17 September 2026. Renamed from ESPN+ in August 2025. The path from 2023 to this price is not charted.",
+      },
+      { year: 2026, price: 13.99, detail: "17 September increase. Annual plan $139.99." },
+    ],
+  },
+  {
+    id: "espn-unlimited",
+    name: "ESPN Unlimited",
+    short: "ESPN Unlimited",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "espn-plan",
+    blurb: "The full ESPN channel lineup as a standalone stream. Short history. Select is the cheaper plan and does not include the linear channels.",
+    source: "ESPN U.S. list prices. Launched 21 August 2025 at $29.99. $31.99 after 17 September 2026 (ESPN Fan Support).",
+    quality: "list",
+    points: [
+      { year: 2025, price: 29.99, detail: "21 August launch." },
+      { year: 2026, price: 31.99, detail: "17 September increase. Annual plan $319.99." },
+    ],
+  },
+  {
+    id: "disney-hulu-ads",
+    name: "Disney+ and Hulu, with ads",
+    short: "Disney+ Hulu ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "disney-bundle",
+    includes: ["disney-ads", "hulu-ads"],
+    blurb: "The with-ads duo. It did not rise in the September 2026 hike. Earlier bundle years are not filled in.",
+    source: "Hulu help center, 30 September 2026, and the 23 September 2026 price notice. With-ads bundle stayed $12.99.",
+    quality: "list",
+    points: [
+      { year: 2025, price: 12.99, detail: "The price the September 2026 notice left unchanged." },
+      { year: 2026, price: 12.99, detail: "Still $12.99 after 23 September 2026." },
+    ],
+  },
+  {
+    id: "disney-hulu-premium",
+    name: "Disney+ and Hulu, no ads",
+    short: "Disney+ Hulu no ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "disney-bundle",
+    includes: ["disney", "hulu-premium"],
+    blurb: "Both services without ads. Cheaper than buying the two no-ads plans separately.",
+    source: "Hulu help center, 30 September 2026. Rose by $2 in the 23 September 2026 notice, from $19.99.",
+    quality: "list",
+    points: [
+      { year: 2025, price: 19.99, detail: "Price before the 23 September 2026 increase." },
+      { year: 2026, price: 21.99, detail: "New-subscriber price after 23 September 2026." },
+    ],
+  },
+  {
+    id: "disney-hulu-espn-select",
+    name: "Disney+, Hulu, ESPN Select, with ads",
+    short: "Trio with ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "disney-bundle",
+    includes: ["disney-ads", "hulu-ads", "espn-select"],
+    blurb: "The with-ads trio. ESPN Select, not Unlimited.",
+    source: "Hulu help center, 30 September 2026. Rose by $2 in the 23 September 2026 notice, from $19.99.",
+    quality: "list",
+    points: [
+      { year: 2025, price: 19.99, detail: "Price before the 23 September 2026 increase." },
+      { year: 2026, price: 21.99 },
+    ],
+  },
+  {
+    id: "disney-hulu-espn-select-premium",
+    name: "Disney+, Hulu, ESPN Select, no ads",
+    short: "Trio no ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "disney-bundle",
+    includes: ["disney", "hulu-premium", "espn-select"],
+    blurb: "Disney+ and Hulu without ads, plus ESPN Select, which still has ads.",
+    source: "Hulu help center, 30 September 2026: $32.99. The 23 September notice put the increase at $3, from $29.99.",
+    quality: "list",
+    points: [
+      { year: 2025, price: 29.99, detail: "Price before the 23 September 2026 increase." },
+      { year: 2026, price: 32.99 },
+    ],
+  },
+  {
+    id: "disney-hulu-espn-unlimited",
+    name: "Disney+, Hulu, ESPN Unlimited, with ads",
+    short: "Unlimited trio",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "disney-bundle",
+    includes: ["disney-ads", "hulu-ads", "espn-unlimited"],
+    blurb: "With-ads Disney+ and Hulu, plus ESPN Unlimited. Unchanged in the September 2026 hike. Unlimited itself only launched in August 2025.",
+    source: "Hulu help center, 30 September 2026. The 23 September notice said this bundle stayed $35.99.",
+    quality: "list",
+    points: [
+      { year: 2025, price: 35.99, detail: "Year-end price. Unlimited launched in August 2025." },
+      { year: 2026, price: 35.99, detail: "Unchanged on 23 September 2026." },
+    ],
+  },
+  {
+    id: "disney-hulu-espn-unlimited-premium",
+    name: "Disney+, Hulu, ESPN Unlimited, no ads",
+    short: "Unlimited trio no ads",
+    aspect: "streaming",
+    unit: "month",
+    hold: true,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "disney-bundle",
+    includes: ["disney", "hulu-premium", "espn-unlimited"],
+    blurb: "Disney+ and Hulu without ads, plus ESPN Unlimited. Unchanged in the September 2026 hike.",
+    source: "Hulu help center, 30 September 2026. The 23 September notice said this bundle stayed $44.99.",
+    quality: "list",
+    points: [
+      { year: 2025, price: 44.99, detail: "Year-end price. Unlimited launched in August 2025." },
+      { year: 2026, price: 44.99, detail: "Unchanged on 23 September 2026." },
     ],
   },
   {
@@ -503,6 +824,7 @@ export const SERIES: Series[] = [
     unit: "month",
     hold: true,
     through: 2026,
+    exclusiveGroup: "yttv-plan",
     blurb: "Base plan with locals in most markets and cloud DVR. The reference live-TV streamer.",
     source: "YouTube TV U.S. base-plan list prices",
     quality: "list",
@@ -556,6 +878,11 @@ export const SERIES: Series[] = [
       { year: 2021, price: 35 },
       { year: 2022, price: 40 },
       { year: 2024, price: 45.99 },
+      {
+        year: 2026,
+        price: 45.99,
+        detail: "Still the Orange list price in October 2026, on Sling’s plan comparison. Cheaper Select and Essentials plans are a different product.",
+      },
     ],
   },
   {
@@ -620,6 +947,66 @@ export const SERIES: Series[] = [
       { year: 2021, price: 25 },
       { year: 2024, price: 28 },
     ],
+  },
+  {
+    id: "yttv-sports",
+    name: "YouTube TV Sports",
+    short: "YT Sports",
+    aspect: "live",
+    unit: "month",
+    hold: false,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "yttv-plan",
+    blurb: "A 2026 genre plan, not a history. It replaces the base plan. It is not added on top of it. Intro rates are ignored.",
+    source: "YouTube blog, 9 February 2026. Sports plan list price $64.99.",
+    quality: "list",
+    points: [{ year: 2026, price: 64.99, detail: "February 2026 list price. New-subscriber intros were lower and are not charted." }],
+  },
+  {
+    id: "yttv-sports-news",
+    name: "YouTube TV Sports + News",
+    short: "YT Sports News",
+    aspect: "live",
+    unit: "month",
+    hold: false,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "yttv-plan",
+    blurb: "Sports plan plus national news. A 2026 snapshot.",
+    source: "YouTube blog, 9 February 2026.",
+    quality: "list",
+    points: [{ year: 2026, price: 71.99, detail: "February 2026 list price." }],
+  },
+  {
+    id: "yttv-entertainment",
+    name: "YouTube TV Entertainment",
+    short: "YT Entertainment",
+    aspect: "live",
+    unit: "month",
+    hold: false,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "yttv-plan",
+    blurb: "The entertainment genre plan. No sports package. A 2026 snapshot.",
+    source: "YouTube blog, 9 February 2026.",
+    quality: "list",
+    points: [{ year: 2026, price: 54.99, detail: "February 2026 list price." }],
+  },
+  {
+    id: "yttv-family",
+    name: "YouTube TV News, Entertainment, Family",
+    short: "YT Family",
+    aspect: "live",
+    unit: "month",
+    hold: false,
+    through: 2026,
+    featured: false,
+    exclusiveGroup: "yttv-plan",
+    blurb: "News, entertainment, and family. A 2026 snapshot. Not the $82.99 base plan.",
+    source: "YouTube blog, 9 February 2026. News + Entertainment + Family plan.",
+    quality: "list",
+    points: [{ year: 2026, price: 69.99, detail: "February 2026 list price." }],
   },
   {
     id: "directv",
@@ -1006,6 +1393,13 @@ export const PRESETS: Preset[] = [
     blurb: "YouTube TV plus the big on-demand apps.",
     ids: ["yttv", "netflix", "disney", "max", "hulu-ads"],
   },
+  {
+    id: "bundle26",
+    label: "2026 bundle household",
+    year: 2026,
+    blurb: "Disney+ and Hulu with ads, Netflix Standard, and Max with ads.",
+    ids: ["disney-hulu-ads", "netflix", "max-ads"],
+  },
 ];
 
 export function seriesById(id: string): Series | undefined {
@@ -1014,6 +1408,61 @@ export function seriesById(id: string): Series | undefined {
 
 export function seriesFor(aspect: AspectId): Series[] {
   return SERIES.filter((s) => s.aspect === aspect);
+}
+
+export function featuredSeries(aspect: AspectId): Series[] {
+  return seriesFor(aspect).filter((series) => series.featured !== false);
+}
+
+function sharesExclusive(a: Series, b: Series): boolean {
+  return a.exclusiveGroup != null && a.exclusiveGroup === b.exclusiveGroup;
+}
+
+function billConflicts(next: Series, other: Series): boolean {
+  if (sharesExclusive(next, other)) return true;
+  if (next.includes?.includes(other.id)) return true;
+  if (other.includes?.includes(next.id)) return true;
+  if (
+    next.includes?.some((included) => {
+      const item = seriesById(included);
+      return item != null && sharesExclusive(item, other) && included !== other.id;
+    })
+  ) {
+    return true;
+  }
+  if (
+    other.includes?.some((included) => {
+      const item = seriesById(included);
+      return item != null && sharesExclusive(item, next) && included !== next.id;
+    })
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Checking a package clears the services inside it, and the reverse. Plans in one group replace each other. */
+export function toggleBill(current: string[], id: string): string[] {
+  if (current.includes(id)) return current.filter((item) => item !== id);
+  const next = seriesById(id);
+  if (!next) return current;
+  return [...current.filter((otherId) => {
+    const other = seriesById(otherId);
+    return other != null && !billConflicts(next, other);
+  }), id];
+}
+
+export function firstPaidPoint(series: Series): PricePoint | undefined {
+  return series.points.find((point) => point.price > 0);
+}
+
+/** What the first paid price would be in `year` if it had only followed CPI. */
+export function inflationGhost(series: Series, year: number): number | null {
+  const base = firstPaidPoint(series);
+  if (!base || year < base.year || year > series.through) return null;
+  const baseCpi = cpiFor(base.year);
+  if (baseCpi <= 0) return null;
+  return base.price * (cpiFor(year) / baseCpi);
 }
 
 export function priceAt(series: Series, year: number): number | null {

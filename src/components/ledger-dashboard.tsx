@@ -1,11 +1,14 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  LabelList,
   Line,
-  LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -17,18 +20,25 @@ import {
   MILESTONES,
   PRESETS,
   SERIES,
+  detailAt,
   displayValue,
+  featuredSeries,
+  inflationGhost,
   priceAt,
   seriesById,
   seriesFor,
   spanOf,
   styleFor,
+  toggleBill,
   unitWord,
   type AspectId,
   type DollarMode,
+  type Milestone,
   type Series,
   type ValueMode,
 } from "@/data/catalog";
+import { HouseholdLine, ReceiptDeck, SparkRow, StackOverTime } from "@/components/ledger-visuals";
+import { CableContext } from "@/components/ledger-context";
 
 type Row = { year: number } & Record<string, number | null>;
 
@@ -120,17 +130,26 @@ function ChartTip({
   payload,
   label,
   mode,
+  series = [],
+  milestones = [],
 }: {
   active?: boolean;
   payload?: Array<{ dataKey?: string | number; value?: number | string | null; color?: string; name?: string }>;
   label?: string | number;
   mode: ValueMode;
+  series?: Series[];
+  milestones?: Milestone[];
 }) {
   if (!active || !payload?.length) return null;
-  const rows = payload.filter((item) => typeof item.value === "number");
+  const rows = payload.filter((item) => typeof item.value === "number" && !String(item.dataKey).startsWith("__band"));
   if (!rows.length) return null;
+  const year = Number(label);
+  const notes = series
+    .map((item) => detailAt(item, year))
+    .filter((note): note is string => Boolean(note));
+  const marks = milestones.filter((item) => item.year === year);
   return (
-    <div className="max-w-64 rounded-2xl border border-line bg-surface px-3 py-2 text-sm shadow-none">
+    <div className="max-w-72 rounded-2xl border border-line bg-surface px-3 py-2 text-sm shadow-none">
       <p className="font-display text-base font-semibold text-ink">{label}</p>
       <ul className="mt-1 space-y-1">
         {rows
@@ -145,6 +164,16 @@ function ChartTip({
             </li>
           ))}
       </ul>
+      {marks.map((item) => (
+        <p key={item.title} className="mt-2 text-ink">
+          {item.title}. {item.text}
+        </p>
+      ))}
+      {notes.map((note) => (
+        <p key={note} className="mt-1 text-muted">
+          {note}
+        </p>
+      ))}
     </div>
   );
 }
@@ -158,6 +187,10 @@ const TrendChart = memo(function TrendChart({
   curve,
   animate,
   heightClass,
+  milestones = [],
+  ghost = null,
+  band = null,
+  labelSteps = false,
 }: {
   series: Series[];
   lo: number;
@@ -167,16 +200,34 @@ const TrendChart = memo(function TrendChart({
   curve: "monotone" | "stepAfter";
   animate: boolean;
   heightClass: string;
+  milestones?: Milestone[];
+  ghost?: Series | null;
+  band?: { lowId: string; highId: string } | null;
+  labelSteps?: boolean;
 }) {
   const rows = useMemo(() => {
     const next: Row[] = [];
     for (let year = lo; year <= hi; year += 1) {
       const row: Row = { year };
       for (const item of series) row[item.id] = displayValue(item, year, dollars, mode);
+      if (band && mode === "dollars") {
+        const low = row[band.lowId];
+        const high = row[band.highId];
+        if (typeof low === "number" && typeof high === "number" && high >= low) {
+          row.__bandBase = low;
+          row.__bandSpan = high - low;
+        } else {
+          row.__bandBase = null;
+          row.__bandSpan = null;
+        }
+      }
+      if (ghost && dollars === "nominal" && mode === "dollars") {
+        row.__ghost = row[ghost.id] == null ? null : inflationGhost(ghost, year);
+      }
       next.push(row);
     }
     return next;
-  }, [series, lo, hi, dollars, mode]);
+  }, [series, lo, hi, dollars, mode, band, ghost]);
 
   const hasAny = rows.some((row) => series.some((item) => row[item.id] != null));
   if (!hasAny) {
@@ -187,10 +238,13 @@ const TrendChart = memo(function TrendChart({
     );
   }
 
+  const showGhost = ghost != null && dollars === "nominal" && mode === "dollars";
+  const showBand = band != null && mode === "dollars";
+
   return (
     <div className={heightClass}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <ComposedChart data={rows} margin={{ top: labelSteps ? 22 : 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           <XAxis
             dataKey="year"
@@ -207,7 +261,63 @@ const TrendChart = memo(function TrendChart({
             width={52}
             tickFormatter={(value: number) => (mode === "index" ? `${Math.round(value)}` : money(value))}
           />
-          <Tooltip content={<ChartTip mode={mode} />} />
+          <Tooltip content={<ChartTip mode={mode} series={series} milestones={milestones} />} />
+          {mode === "index" ? (
+            <>
+              <ReferenceLine y={100} stroke="var(--color-line)" strokeDasharray="4 4" />
+              <ReferenceLine y={200} stroke="var(--color-line)" strokeDasharray="4 4" />
+            </>
+          ) : null}
+          {milestones
+            .filter((item) => item.year >= lo && item.year <= hi)
+            .map((item) => (
+              <ReferenceLine
+                key={`${item.year}-${item.title}`}
+                x={item.year}
+                stroke="var(--color-copper)"
+                strokeDasharray="2 3"
+                strokeOpacity={0.8}
+              />
+            ))}
+          {showBand ? (
+            <>
+              <Area
+                dataKey="__bandBase"
+                stackId="band"
+                stroke="none"
+                fill="transparent"
+                connectNulls={false}
+                tooltipType="none"
+                legendType="none"
+                isAnimationActive={false}
+              />
+              <Area
+                dataKey="__bandSpan"
+                name="Basic to bundle"
+                stackId="band"
+                stroke="none"
+                fill="var(--color-copper)"
+                fillOpacity={0.16}
+                connectNulls={false}
+                tooltipType="none"
+                legendType="none"
+                isAnimationActive={animate}
+              />
+            </>
+          ) : null}
+          {showGhost ? (
+            <Line
+              type="monotone"
+              dataKey="__ghost"
+              name="If it only tracked CPI"
+              stroke="var(--color-bronze)"
+              strokeDasharray="2 4"
+              strokeWidth={1.5}
+              dot={false}
+              connectNulls={false}
+              isAnimationActive={animate}
+            />
+          ) : null}
           {series.map((item) => {
             const style = styleFor(item);
             const plotted = rows.filter((row) => row[item.id] != null).length;
@@ -222,16 +332,103 @@ const TrendChart = memo(function TrendChart({
                 strokeDasharray={style.dash}
                 dot={plotted > 0 && plotted <= 16 ? { r: 3.5, fill: style.stroke, strokeWidth: 0 } : false}
                 activeDot={{ r: 5 }}
-                connectNulls
+                connectNulls={item.hold}
                 isAnimationActive={animate}
-              />
+              >
+                {labelSteps && curve === "stepAfter" && mode === "dollars" ? (
+                  <LabelList
+                    dataKey={item.id}
+                    content={(props) => {
+                      const index = typeof props.index === "number" ? props.index : Number(props.index);
+                      const row = rows[index];
+                      if (!row || !item.points.some((point) => point.year === row.year)) return null;
+                      const value = row[item.id];
+                      if (typeof value !== "number" || props.x == null || props.y == null) return null;
+                      return (
+                        <text
+                          x={Number(props.x)}
+                          y={Number(props.y) - 8}
+                          textAnchor="middle"
+                          fill="var(--color-ink)"
+                          fontSize={11}
+                        >
+                          {money(value)}
+                        </text>
+                      );
+                    }}
+                  />
+                ) : null}
+              </Line>
             );
           })}
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
 });
+
+function RentalCharts({
+  nights,
+  mail,
+  lo,
+  hi,
+  dollars,
+  mode,
+  animate,
+  mounted,
+  milestones,
+}: {
+  nights: Series[];
+  mail: Series[];
+  lo: number;
+  hi: number;
+  dollars: DollarMode;
+  mode: ValueMode;
+  animate: boolean;
+  mounted: boolean;
+  milestones: Milestone[];
+}) {
+  if (!mounted) return <p className="flex h-72 items-center text-sm text-muted">Drawing the series…</p>;
+  const blockbuster = nights.find((item) => item.id === "blockbuster") ?? null;
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h3 className="mb-2 font-display text-lg font-semibold">One night</h3>
+        {nights.length > 4 ? (
+          <SparkRow series={nights} lo={lo} hi={hi} dollars={dollars} mode={mode} />
+        ) : null}
+        <TrendChart
+          series={nights}
+          lo={lo}
+          hi={hi}
+          dollars={dollars}
+          mode={mode}
+          curve="monotone"
+          animate={animate}
+          heightClass="h-64"
+          milestones={milestones}
+          ghost={blockbuster}
+          labelSteps={nights.length > 0 && nights.length <= 2}
+        />
+      </div>
+      <div>
+        <h3 className="mb-2 font-display text-lg font-semibold">A month of discs</h3>
+        <TrendChart
+          series={mail}
+          lo={lo}
+          hi={hi}
+          dollars={dollars}
+          mode={mode}
+          curve="stepAfter"
+          animate={animate}
+          heightClass="h-52"
+          milestones={milestones}
+          labelSteps={mail.length > 0 && mail.length <= 2}
+        />
+      </div>
+    </div>
+  );
+}
 
 const RankChart = memo(function RankChart({
   series,
@@ -370,14 +567,16 @@ function Card({
   caption,
   children,
   action,
+  className = "",
 }: {
   title: string;
   caption?: string;
   children: ReactNode;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="ledger-card rounded-2xl bg-surface p-4 md:p-5">
+    <section className={`ledger-card rounded-2xl bg-surface p-4 md:p-5 ${className}`}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="font-display text-xl font-semibold text-ink md:text-2xl">{title}</h2>
@@ -407,7 +606,7 @@ export function LedgerDashboard() {
   const [to, setTo] = useState(2024);
   const [settledFrom, setSettledFrom] = useState(1955);
   const [settledTo, setSettledTo] = useState(2024);
-  const [selected, setSelected] = useState<string[]>(() => seriesFor("cable").map((item) => item.id));
+  const [selected, setSelected] = useState<string[]>(() => featuredSeries("cable").map((item) => item.id));
   const [dollars, setDollars] = useState<DollarMode>("nominal");
   const [mode, setMode] = useState<ValueMode>("dollars");
   const [bill, setBill] = useState<string[]>(PRESETS[3]?.ids ?? []);
@@ -443,7 +642,7 @@ export function LedgerDashboard() {
     setTo(nextSpan.max);
     setSettledFrom(nextSpan.min);
     setSettledTo(nextSpan.max);
-    setSelected(next === "all" ? [] : seriesFor(next).map((item) => item.id));
+    setSelected(next === "all" ? [] : featuredSeries(next).map((item) => item.id));
   }
 
   function applyPreset(id: string) {
@@ -520,6 +719,17 @@ export function LedgerDashboard() {
     .filter((row): row is { item: Series; price: number } => row.price != null);
   const monthSum = monthlyBill.reduce((sum, row) => sum + row.price, 0);
   const onceSum = onceBill.reduce((sum, row) => sum + row.price, 0);
+  const bundleNotes = monthlyBill.flatMap((row) => {
+    if (!row.item.includes?.length) return [];
+    const names = row.item.includes
+      .map((id) => seriesById(id)?.short)
+      .filter((name): name is string => Boolean(name));
+    const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "its parts");
+    return [`${row.item.short} already includes ${list}. Those are not added again.`];
+  });
+  const planNote = monthlyBill.some((row) => row.item.exclusiveGroup === "yttv-plan")
+    ? "YouTube TV plans replace each other, so only one is on this total."
+    : null;
   const cableBench = seriesById("cable-expanded");
   let cableNote: { year: number; price: number } | null = null;
   if (cableBench) {
@@ -663,9 +873,10 @@ export function LedgerDashboard() {
         </div>
 
         {aspect === "all" ? (
+          <>
           <div className="grid gap-4 lg:grid-cols-2">
             {ASPECTS.map((item) => {
-              const group = seriesFor(item.id);
+              const group = featuredSeries(item.id);
               const groupSpan = spanOf(item.id);
               const groupLo = Math.max(lo, groupSpan.min);
               const groupHi = Math.min(hi, groupSpan.max);
@@ -694,6 +905,7 @@ export function LedgerDashboard() {
                       curve={item.curve}
                       animate={animate}
                       heightClass="h-52"
+                      milestones={MILESTONES.filter((mark) => mark.aspect === item.id)}
                     />
                   ) : (
                     <p className="flex h-52 items-center text-sm text-muted">
@@ -704,6 +916,8 @@ export function LedgerDashboard() {
               );
             })}
           </div>
+          <HouseholdLine lo={lo} hi={hi} />
+          </>
         ) : (
           <>
             <Card
@@ -731,53 +945,133 @@ export function LedgerDashboard() {
                         (on ? "border-ink bg-surface text-ink" : "border-line text-muted")
                       }
                     >
-                      <span
-                        className="inline-block h-0.5 w-5"
-                        style={{
-                          background: on ? style.stroke : "var(--color-line)",
-                          // dashed legend via border when needed
-                        }}
-                      />
+                      <svg width="20" height="6" aria-hidden="true" className="shrink-0">
+                        <line
+                          x1="0"
+                          y1="3"
+                          x2="20"
+                          y2="3"
+                          stroke={on ? style.stroke : "var(--color-line)"}
+                          strokeWidth="2"
+                          strokeDasharray={style.dash}
+                        />
+                      </svg>
                       {item.short}
                     </button>
                   );
                 })}
               </div>
-              {mounted ? (
-                <TrendChart
-                  series={active}
+              {pool.some((item) => item.featured === false) ? (
+                <p className="mb-3 text-xs text-muted">
+                  Comparison prices start off, so the main lines stay readable. Turn one on to add it.
+                </p>
+              ) : null}
+              {aspect === "rent" ? (
+                <RentalCharts
+                  nights={active.filter((item) => item.unit === "night")}
+                  mail={active.filter((item) => item.unit === "month")}
                   lo={lo}
                   hi={hi}
                   dollars={dollars}
                   mode={mode}
-                  curve={meta?.curve ?? "monotone"}
                   animate={animate}
-                  heightClass="h-72 md:h-80"
+                  mounted={mounted}
+                  milestones={MILESTONES.filter((mark) => mark.aspect === "rent")}
                 />
+              ) : mounted ? (
+                <>
+                  {active.length > 4 && (aspect === "streaming" || aspect === "live") ? (
+                    <SparkRow series={active} lo={lo} hi={hi} dollars={dollars} mode={mode} />
+                  ) : null}
+                  <TrendChart
+                    series={active}
+                    lo={lo}
+                    hi={hi}
+                    dollars={dollars}
+                    mode={mode}
+                    curve={meta?.curve ?? "monotone"}
+                    animate={animate}
+                    heightClass="h-72 md:h-80"
+                    milestones={MILESTONES.filter((mark) => mark.aspect === aspect)}
+                    ghost={
+                      meta && active.some((item) => item.id === meta.primaryId)
+                        ? seriesById(meta.primaryId)
+                        : null
+                    }
+                    band={
+                      aspect === "cable" &&
+                      active.some((item) => item.id === "cable-basic") &&
+                      active.some((item) => item.id === "cable-bundle")
+                        ? { lowId: "cable-basic", highId: "cable-bundle" }
+                        : null
+                    }
+                    labelSteps={active.length > 0 && active.length <= 2}
+                  />
+                </>
               ) : (
                 <p className="flex h-72 items-center text-sm text-muted">Drawing the series…</p>
               )}
               {mode === "index" ? (
                 <p className="mt-2 text-xs text-muted">
-                  100 is the first paid price of that series. Later years are an index, not dollars.
+                  100 is the first paid price of that series. The rules sit at 100 and at 200. Later years are an index, not dollars.
+                </p>
+              ) : dollars === "nominal" && meta && active.some((item) => item.id === meta.primaryId) ? (
+                <p className="mt-2 text-xs text-muted">
+                  The pale line is {seriesById(meta.primaryId)?.short} if its first paid price had only followed CPI.
+                  {aspect === "cable" ? " The tint is the FCC basic tier up to the bundle with equipment." : ""}
                 </p>
               ) : null}
             </Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card
-                title={`Ranked in ${hi}`}
-                caption="Only series with a published figure in the snapshot year. Units match this format."
-              >
-                {mounted ? (
-                  <RankChart series={active} year={hi} dollars={dollars} mode={mode} animate={animate} />
-                ) : (
-                  <p className="text-sm text-muted">Drawing the bars…</p>
-                )}
-              </Card>
+              {aspect === "rent" ? (
+                <>
+                  <Card
+                    title={`One night in ${hi}`}
+                    caption="A store, a kiosk, or a digital rental. Not a monthly plan."
+                  >
+                    {mounted ? (
+                      <RankChart
+                        series={active.filter((item) => item.unit === "night")}
+                        year={hi}
+                        dollars={dollars}
+                        mode={mode}
+                        animate={animate}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted">Drawing the bars…</p>
+                    )}
+                  </Card>
+                  <Card title={`A month of discs in ${hi}`} caption="Mail plans. One price covers the month, not one movie.">
+                    {mounted ? (
+                      <RankChart
+                        series={active.filter((item) => item.unit === "month")}
+                        year={hi}
+                        dollars={dollars}
+                        mode={mode}
+                        animate={animate}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted">Drawing the bars…</p>
+                    )}
+                  </Card>
+                </>
+              ) : (
+                <Card
+                  title={`Ranked in ${hi}`}
+                  caption="Only series with a published figure in the snapshot year. Units match this format."
+                >
+                  {mounted ? (
+                    <RankChart series={active} year={hi} dollars={dollars} mode={mode} animate={animate} />
+                  ) : (
+                    <p className="text-sm text-muted">Drawing the bars…</p>
+                  )}
+                </Card>
+              )}
               <Card
                 title="How much it moved"
                 caption="Percent change from each series’ first price in the window to its last. Copper is up, green is down."
+                className={aspect === "rent" ? "lg:col-span-2" : undefined}
               >
                 {mounted ? (
                   <ChangeChart series={active} lo={lo} hi={hi} dollars={dollars} animate={animate} />
@@ -882,8 +1176,13 @@ export function LedgerDashboard() {
                 })}
               </ul>
             </Card>
+            {aspect === "cable" ? (
+              <CableContext year={hi} lo={lo} hi={hi} dollars={dollars} animate={animate} />
+            ) : null}
           </>
         )}
+
+        <ReceiptDeck dollars={dollars} onPick={applyPreset} />
 
         <Card
           title={`Build a ${hi} bill`}
@@ -923,13 +1222,7 @@ export function LedgerDashboard() {
                               className="tick"
                               type="checkbox"
                               checked={on}
-                              onChange={() =>
-                                setBill((current) =>
-                                  current.includes(item.id)
-                                    ? current.filter((id) => id !== item.id)
-                                    : [...current, item.id],
-                                )
-                              }
+                              onChange={() => setBill((current) => toggleBill(current, item.id))}
                             />
                             <span className="flex-1">{item.short}</span>
                             <span className="text-muted">
@@ -967,7 +1260,16 @@ export function LedgerDashboard() {
                   average.
                 </p>
               ) : null}
+              {planNote ? <p className="mt-3 text-sm text-paper-2">{planNote}</p> : null}
+              {bundleNotes.map((note) => (
+                <p key={note} className="mt-3 text-sm text-paper-2">
+                  {note}
+                </p>
+              ))}
             </div>
+          </div>
+          <div className="mt-4">
+            <StackOverTime ids={bill} hi={hi} dollars={dollars} animate={animate && mounted} />
           </div>
         </Card>
 
@@ -985,7 +1287,7 @@ export function LedgerDashboard() {
                     setTo(end);
                     setSettledFrom(nextSpan.min);
                     setSettledTo(end);
-                    setSelected(seriesFor(item.aspect).map((series) => series.id));
+                    setSelected(featuredSeries(item.aspect).map((series) => series.id));
                   }}
                   className="flex min-h-11 w-full gap-4 rounded-2xl px-2 py-2 text-left transition-[background-color] duration-150 hover:bg-paper"
                 >
@@ -1012,7 +1314,25 @@ export function LedgerDashboard() {
             <p>
               Cable, 1995–2024: FCC reports on cable industry prices (most recently FCC 24-136). Expanded basic,
               basic, and the next-most-popular service plus equipment are subscriber-weighted national averages.
-              There is no matching FCC reading for 2025 or 2026 yet.
+              There is no matching FCC reading for 2025 or 2026 in this ledger. The 2026 survey (DA 26-303) asked
+              operators for 1 January 2025 and 1 January 2026 prices. Those readings are not charted here.
+            </p>
+            <p>
+              Channel counts and the FCC’s price-per-channel column come from the same historical tables. The
+              channel definition widens in 2010 and changes again after 2020, so those stretches are separate lines.
+              The 1 January 2024 reading is 89 cents per expanded-basic channel and $1.21 per basic channel.
+            </p>
+            <p>
+              Cable households through 2001 are a compiled count (Kagan, NCTA, and the International Television
+              Almanac 2003). Traditional pay TV — cable, satellite, and telephone-company video — is a different
+              series: 101.6 million at the 2012 peak, 61.9 million at the end of 2022, and 54.1 million at the end
+              of 2023, from the FCC 2024 Communications Marketplace Report citing S&P Global. The 2023 cable point
+              is that report’s 65.3% cable share of the 54.1 million.
+            </p>
+            <p>
+              Hours of work are FCC expanded basic divided by BLS average hourly earnings, total private
+              (CES0500000003), the annual mean of the monthly series. They do not follow the 2026-dollar toggle.
+              The wage is an average, not a typical household’s pay.
             </p>
             <p>
               Cable, 1955–1984: Paul Kagan Associates historical averages. 1987 is the NCTA / Arthur Andersen June
@@ -1020,9 +1340,13 @@ export function LedgerDashboard() {
               Community antenna television itself starts in 1948; a clean national price series does not.
             </p>
             <p>
-              Streaming and live TV: year-end U.S. list price of the named tier, compiled from company announcements
-              and price trackers (including Streaming Price Tracker and Streaming Better). Promotional trials are
-              ignored. Hulu + Live in 2026 reflects the September increase for new subscribers.
+              Streaming and live TV: year-end U.S. list price of the named tier, from company announcements and
+              help pages (Hulu and Disney help centers, ESPN Fan Support, the YouTube blog for the February 2026
+              genre plans). Promotional and intro rates are ignored. Ads tiers, no-ads twins, Disney bundles, ESPN
+              Select and Unlimited, and the YouTube TV genre plans start off on the chart. A bundle and the
+              services inside it are not added twice. YouTube TV genre plans are 2026 list prices only. Hulu + Live
+              in 2026 reflects the September increase for new subscribers. Sling Orange was still $45.99 in October
+              2026. Prime’s annual plan was still $139.
             </p>
             <p>
               Satellite: DirecTV’s 1994 launch price is documented; later DirecTV points are compiled package rates,
